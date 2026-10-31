@@ -206,11 +206,17 @@ ix_show:
 .empty: pop de
         jp tx_clrrow
 
-; wrap_ram: the text at HL wrapped (no gaps) into rows from D, B rows, from column 1
+; wrap_ram: the text at HL wrapped (no gaps) into rows from D, at most B rows, from
+; column 1; D = the row after the last one used
 wrap_ram:
-.r:     push bc
-        push de
         call skipsp
+        jr .f
+.r:     call skipsp
+        ld a,(hl)               ; (all of it shown: no more rows)
+        or a
+        ret z
+.f:     push bc
+        push de
         ld a,(sw)
         sub 2
         ld c,a

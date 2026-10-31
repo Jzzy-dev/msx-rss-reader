@@ -45,6 +45,7 @@ V_INFO  equ 3
         VAR quitask, 1
         VAR quit, 1
         VAR net_tried, 1
+        VAR info_row, 1
         VAR ldue, 2
         VAR tbuf, 164           ; a title
         VAR lb, 100             ; a line being put together
@@ -1738,6 +1739,8 @@ nw_skeys:
 nw_infov:
         ld a,V_INFO
         ld (v_view),a
+        ld a,3
+        ld (info_row),a
         call tx_cls
         call row0
         ld hl,txt_ihead
@@ -1774,8 +1777,7 @@ nw_infov:
         ld h,0
         call fmt_u16
         call put_tls
-.n2:    ld d,3
-        call .line
+.n2:    call .line
         ld de,lb                ; the machine
         ld hl,txt_i_msx
         call strcpy
@@ -1793,7 +1795,6 @@ nw_infov:
         call strcpy
         xor a
         ld (de),a
-        ld d,4
         call .line
         ld de,lb                ; the feed
         ld hl,txt_i_feed
@@ -1826,10 +1827,8 @@ nw_infov:
         call fmt_u16
         xor a
         ld (de),a
-        ld d,5
         call .line
         ld hl,n_url
-        ld d,6
         call .line2
         ld de,lb                ; the memory
         ld hl,txt_i_mem
@@ -1852,7 +1851,6 @@ nw_infov:
         call fmt_u16
         xor a
         ld (de),a
-        ld d,7
         call .line
         ld de,lb                ; RSS.INI, the time zone
         ld hl,txt_i_ini
@@ -1879,17 +1877,19 @@ nw_infov:
         call strcpy
         xor a
         ld (de),a
-        ld d,8
         call .line
+        ld hl,info_row          ; (an empty row before it)
+        inc (hl)
         ld hl,txt_i_keys
-        ld d,10
         jr .line2
 .line:  ld hl,lb
-.line2: ld e,1
-        ld a,(sw)
-        sub 2
-        ld b,a
-        jp tx_text
+.line2: ld a,(info_row)         ; wrapped, from the row it has got to
+        ld d,a
+        ld b,5
+        call wrap_ram
+        ld a,d
+        ld (info_row),a
+        ret
 
 ; the keys of every view
 nw_kcommon:
@@ -1984,4 +1984,6 @@ txt_inis:   db "no disk",0,"not there yet",0,"read",0
 txt_i_tz:   db ", local time UTC",0
 txt_i_min:  db " min",0
 txt_tzs:    db " (not known)",0," (RSS.INI tz=)",0," (the MSX clock)",0
-txt_i_keys: db "Errors: 1 no network, 2 DNS, 3 connection, 4 time, 5 HTTP, 6 URL, 7 TLS, 8 closed",0
+txt_i_keys: db "Errors: 1 no network, 2 DNS (name not found), 3 no connection, "
+            db "4 no answer in time, 5 HTTP (the server said no), 6 not a URL, "
+            db "7 https needs TLS, 8 closed before the answer",0
