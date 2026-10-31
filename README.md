@@ -22,10 +22,11 @@ The stories and the article are stored in VRAM (24 KB and 32 KB on an MSX2), so 
 
 It starts in My feeds (Enter or 1-9 reads a feed), after a start screen while it looks for the network.
 
-![the start screen](images/rss_start.png)
-![headlines](images/rss_list.png)
-![a story, the full article](images/rss_article.png)
-![My feeds and the catalogue](images/rss_feeds.png)
+<img width="1810" height="1356" alt="0  looking for the network" src="https://github.com/user-attachments/assets/fae4a97e-f2cb-400b-acf1-e67bca7dff36" />
+<img width="2000" height="1500" alt="1  MSX RSS on PicoVerse" src="https://github.com/user-attachments/assets/a17f48da-65a9-4185-8f72-382c49a3348e" />
+<img width="2000" height="1500" alt="2  MSX RSS on MSXPICO" src="https://github.com/user-attachments/assets/475b0045-a1c6-48d6-8bf0-4ee117a6b660" />
+<img width="962" height="747" alt="3  MSX RSS on OpenMSX" src="https://github.com/user-attachments/assets/7d1398a7-0cb9-4bd1-aea7-122df54be473" />
+
 ![MSX1, 40 columns](images/rss_msx1.png)
 
 ## Networks
