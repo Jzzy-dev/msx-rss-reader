@@ -597,6 +597,7 @@ int main(int argc, char **argv)
     f = fopen(argv[6], "wb");
     fwrite(vram, 1, 0x20000, f);
     fwrite(vregs, 1, 64, f);
+    if (getenv("RSS_RAM")) { FILE *r = fopen(getenv("RSS_RAM"), "wb"); fwrite(mem, 1, 65536, r); fclose(r); }
     fclose(f);
     return 0;
 }

@@ -51,10 +51,12 @@ Stock openMSX has no network emulation. Use openMSXnet(-tls) for that.
 
 | View | Keys |
 |---|---|
-| Headlines | **Up/Down** choose, **Left/Right** a page, **Enter** the story, **1-9** a feed of My feeds, **F** or **BS** My feeds, **R** fetch again, **I** info, **ESC** quit |
+| Headlines | **Up/Down** choose, **Left/Right** a page, **Enter** the story, **1-9** a feed of My feeds, **F** or **BS** My feeds, **R** fetch again, **S** newest first / the feed's order, **I** info, **ESC** quit |
 | A story | **Up/Down** a line, **Left/Right** a page, **Enter** the full article / back to the summary, **N/P** next/previous story, **ESC** the headlines |
 | My feeds (the start) | **1-9** read that feed, **Left/Right/TAB** the side, **Up/Down** choose, **Enter** read (left) / open a topic, add a feed (right), **D** or **DEL** remove, **U/J** move up/down, **BS** back, **ESC** the headlines |
 | Info (I) | the network, TLS, the machine, the feed's state and error, memory, RSS.INI, the time zone; **ESC** back |
+
+The stories are shown newest first; stories without a date follow the dated ones, in the feed's order. Press **S** for the feed's own order, for example the editorial order of BBC News; the choice is kept in RSS.INI. When memory is full, the oldest story makes room for a newer one, so a long feed that lists the oldest first still shows its newest stories.
 
 The full article comes in while you read it. The status bar shows the KB read, plus a percentage when the server gives a size.
 
@@ -67,10 +69,12 @@ feeds=bbcw,alj,dw,guardw,nos
 feed1=My own site|https://example.com/rss.xml
 proxy=192.168.1.10:8088
 tz=+60
+sort=date
 ```
 
 - **`feeds=`** My feeds, in order (at most 20). The codes are those of the catalogue (`src/feeds_cat.c`: 110 feeds in 11 topics, the same as in PicoAmp). `#1`..`#9` refer to `feed1=`..`feed9=` lines with your own feeds. The reader rewrites this line when you change My feeds in the program. Without it, the default feeds apply, plus any `feedN=` lines.
 - **`proxy=`** host:port of `rss_proxy.py`, used for https when the network has no TLS.
+- **`sort=`** `date` (newest first, the default) or `feed` (the feed's order). The S key sets it.
 - **`tz=`** local time minus UTC, in minutes. Without it, an MSX2 works it out from its clock chip and the web's Date header. Times are shown in local time: "20:15" for today, "29 Oct" for an earlier day.
 
 ## The https proxy
@@ -102,7 +106,7 @@ The source is Z80 assembly for sjasmplus. It is assembled twice: at 0100h with v
 ## Tests
 
 - **`test/z80_rss.c`** runs RSS.COM or RSS.ROM in a Z80 emulator with a small MSX around it. It provides the BIOS calls, FCB disk calls, a V9938 or TMS9918, the RTC, and a TCP/IP UNAPI answering from the fixture feeds in `test/fix`. The implementation can sit in a ROM, in page 3 or in a mapper segment, with or without TLS, and with a proxy.
-- **`test/regress.sh`** runs 20 checks with it: every feed format, redirects, both kinds of full article, no TLS, the proxy, the three implementation kinds, the ROM, MSX1, My feeds saved, and the time zone. `test/vram2png.py` draws the screen.
+- **`test/regress.sh`** runs 25 checks with it: every feed format, sorting and a long oldest-first feed, redirects, both kinds of full article, no TLS, the proxy, the three implementation kinds, the ROM, MSX1, My feeds saved, and the time zone. `test/vram2png.py` draws the screen.
 - **`test/omsx/`** has a Tcl TCP/IP UNAPI implementation for openMSX (`unapi.tcl`, with `FAKEUNAPI.ROM`). It was used to test both programs on a real MSX2 BIOS with Nextor and with disk BASIC (the ROM's H.STKE start, RSS.INI saved on the disk).
 
 This work is licensed under a "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License", as PicoAmp is.

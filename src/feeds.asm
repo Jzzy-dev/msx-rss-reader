@@ -146,7 +146,17 @@ ini_load:
         inc hl
         call num
 .pn:    ld (prx_port),de
-.np:    ld de,txt_k_feeds       ; no feeds=: the default ones and feed1-9
+.np:    ld a,1                  ; sort=feed: the feed's order (else newest first)
+        ld (srt_date),a
+        ld de,txt_k_sort
+        call ini_find
+        jr nz,.ns
+        ld de,txt_feed
+        call str_beg
+        jr nz,.ns
+        xor a
+        ld (srt_date),a
+.ns:    ld de,txt_k_feeds       ; no feeds=: the default ones and feed1-9
         call ini_find
         ret z
         ld hl,cat_default
@@ -205,6 +215,10 @@ ini_save:
 txt_k_feeds: db "feeds=",0
 txt_k_tz:    db "tz=",0
 txt_k_proxy: db "proxy=",0
+txt_k_sort:  db "sort=",0
+txt_feed:    db "feed",0
+txt_vdate:   db "date",0
+        VAR ip_key, 2           ; the key fv_store writes (feeds= or sort=)
         VAR txt_k_feedn, 7      ; "feedN=" (made when needed)
 
 ; ini_find: DE = "key=" -> Z, HL = its value (to the end of the line)
@@ -245,14 +259,22 @@ ini_find:
 
 ; fv_store: the favourites in fv_tmp to RSS.INI (feeds= first), saved
 fv_store:
+        ld hl,txt_k_feeds
+        ld (ip_key),hl
         call .put
         jp ini_save
 .nosave:
-.put:   ld de,txt_k_feeds       ; the old line out
+        ld hl,txt_k_feeds
+        ld (ip_key),hl
+.put:   ld de,(ip_key)          ; the old line out
         call ini_find
         jr nz,.ins
-        ld de,-6
-        add hl,de
+        push hl
+        ld hl,(ip_key)          ; (back by the key's length)
+        call strlen
+        pop hl
+        or a
+        sbc hl,bc
         ld (fs_ls),hl
 .e:     ld a,(hl)
         or a
@@ -281,8 +303,13 @@ fv_store:
         ld (ini_len),bc
 .ins:   ld hl,fv_tmp            ; the new one: "feeds=" value CR LF
         call strlen
-        ld hl,8
+        push bc
+        ld hl,(ip_key)
+        call strlen
+        pop hl
         add hl,bc
+        inc hl
+        inc hl                  ; (CR LF)
         ld (fs_l),hl
         ld de,(ini_len)
         add hl,de
@@ -302,7 +329,7 @@ fv_store:
         ex de,hl
         pop hl
         lddr
-        ld hl,txt_k_feeds
+        ld hl,(ip_key)
         ld de,ini_buf
         call strcpy
         ld hl,fv_tmp
@@ -318,6 +345,20 @@ fv_store:
         ret
         VAR fs_ls, 2
         VAR fs_l, 2
+
+; srt_save: sort= in RSS.INI (date / feed)
+srt_save:
+        ld hl,txt_k_sort
+        ld (ip_key),hl
+        ld a,(srt_date)
+        or a
+        ld hl,txt_vdate
+        jr nz,.d
+        ld hl,txt_feed
+.d:     ld de,fv_tmp
+        call strcpy
+        call fv_store.put
+        jp ini_save
 
 ;------------------------------------------------------------------------------
 ; the favourites: the value of feeds=, "code,code,#2"
@@ -765,6 +806,16 @@ news_fetch:
         ld (feed_full),a
         ld a,#FF
         ld (a_story),a
+        ld hl,0
+        ld (garbage),hl
+        ld hl,(pool_size)
+        srl h
+        rr l
+        srl h
+        rr l
+        srl h
+        rr l
+        ld (it_rsv),hl
         ld hl,(pool_base)
         ld de,(pool_size)
         call w_open
@@ -783,11 +834,16 @@ news_fetch:
         ret
 
 feed_body:
+        ld a,(h_got+2)          ; (at most 512 KB of a feed)
+        cp 8
+        ccf
+        ret c
         jp x_run
 
 feed_done:
         push af
         call w_flush
+        call it_sort
         ld hl,(w_len)
         ld (pool_len),hl
         ld a,(net_err)
@@ -833,8 +889,11 @@ news_full:
 .sl:    ld (a_slen),bc
         pop af
         call it_ptr
-        ld bc,6
+        ld bc,9
         add hl,bc
+        ld a,(hl)               ; its place in the feed (the article from the feed: found by it)
+        ld (a_pos),a
+        dec hl
         ld a,(hl)               ; the content is in the feed: phase 1
         or a
         ld a,1
@@ -965,44 +1024,16 @@ art_fail:
 ;------------------------------------------------------------------------------
 ; the stories in the pool
 
-; it_ptr: A = story -> HL = its entry
-it_ptr: ld l,a
-        ld h,0
-        ld d,h
-        ld e,l
-        add hl,hl
-        add hl,hl
-        add hl,hl
-        or a
-        sbc hl,de
-        ld de,items
-        add hl,de
-        ret
-
 ; it_range: A = story -> HL = its record in VRAM, BC = its length
 it_range:
-        push af
         call it_ptr
         ld e,(hl)
         inc hl
         ld d,(hl)
-        pop af
-        inc a
-        ld hl,nitems
-        cp (hl)
-        ld hl,(pool_len)
-        jr nc,.l
-        push de
-        call it_ptr
-        ld a,(hl)
         inc hl
-        ld h,(hl)
-        ld l,a
-        pop de
-.l:     or a
-        sbc hl,de
-        ld b,h
-        ld c,l
+        ld c,(hl)
+        inc hl
+        ld b,(hl)
         ld hl,(pool_base)
         add hl,de
         ret

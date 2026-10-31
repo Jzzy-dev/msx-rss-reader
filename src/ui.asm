@@ -587,8 +587,8 @@ st_time:
         ld (st_i),a
         push de
         call it_ptr
-        inc hl
-        inc hl
+        ld de,4                 ; (its days, minutes)
+        add hl,de
         ld e,(hl)
         inc hl
         ld d,(hl)
@@ -774,8 +774,8 @@ nw_story2:
         call tx_text
         ld a,(n_sel)            ; its date (long)
         call it_ptr
-        inc hl
-        inc hl
+        ld de,4                 ; (its days, minutes)
+        add hl,de
         ld e,(hl)
         inc hl
         ld d,(hl)
@@ -1584,7 +1584,7 @@ ui_key: ld c,a
         cp 28
         jr z,.right
         cp 13
-        jr z,.enter
+        jp z,.enter
         cp 8
         jp z,nw_feeds
         cp 27
@@ -1594,6 +1594,8 @@ ui_key: ld c,a
         jp z,nw_feeds
         cp 'R'
         jr z,.again
+        cp 'S'
+        jp z,nw_sort
         jp nw_kcommon
 .again: ld a,(nf)
         or a
@@ -1650,6 +1652,31 @@ ui_key: ld c,a
 .enter: call .list
         ret z
         jp nw_story
+
+; S: newest first / the feed's order (kept in RSS.INI)
+nw_sort:
+        ld a,(n_wait)
+        or a
+        ret nz
+        ld a,(srt_date)
+        xor 1
+        ld (srt_date),a
+        call srt_save
+        ld a,(n_n)
+        or a
+        jr z,.m
+        call it_sort
+        xor a
+        ld (n_sel),a
+        ld (n_first),a
+        ld (ix_src),a
+        call nw_list
+.m:     ld a,(srt_date)
+        or a
+        ld hl,txt_snew
+        jr nz,.w
+        ld hl,txt_sfeed
+.w:     jp nw_msg
 
 nw_fback2:                      ; from the info: the headlines (or My feeds)
         ld a,(n_n)
@@ -1907,18 +1934,20 @@ txt_sep:    db "   ",TX_VL,"  ",0
 txt_tls:    db ", TLS",0
 txt_notls:  db ", no TLS (http only)",0
 txt_prx:    db ", https by proxy",0
+txt_snew:   db " Sorted: newest first",0
+txt_sfeed:  db " Sorted: as the feed has them",0
 txt_nonet0: db "no TCP/IP UNAPI network",0
 txt_look:   db "Looking for the network...",0
 txt_credits:db "by JZZY & CLAUDE 2026",0
 txt_k80:    db " Enter read  Up/Down choose  Left/Right page  1-9 a feed  F My feeds  R again",0
-            db " I info   ESC quit",0
+            db " S sort   I info   ESC quit",0
             db " Up/Down scroll  Left/Right page  Enter full article/summary  N/P next/prev",0
             db " ESC the headlines   I info",0
             db " Left/Right side  Enter read/add  D remove  U/J move  BS back",0
             db " ESC the headlines   I info   Q quit",0
             db " ESC, Enter or BS: back",0
             db " Q quit",0
-txt_k40:    db " Enter Up/Down Left/Right 1-9 F R",0
+txt_k40:    db " Enter Up/Down Left/Right 1-9 F R S",0
             db " F My feeds  I info  ESC quit",0
             db " Up/Down Left/Right Enter N/P",0
             db " Enter: the full article  ESC back",0

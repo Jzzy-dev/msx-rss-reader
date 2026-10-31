@@ -10,6 +10,7 @@
 ;==============================================================================
 
 MAX_ITEMS equ 50
+IT_SIZE   equ 10
 
         VAR w_base, 2           ; the writer: VRAM where it goes,
         VAR w_size, 2           ; the room,
@@ -98,8 +99,10 @@ w_flush:
         pop hl
         ret
 
-; w_trunc: back to HL bytes
+; w_trunc: back to HL bytes (the room is there again)
 w_trunc:
+        xor a
+        ld (w_full),a
         push de
         push bc
         ex de,hl                ; DE = the new length
@@ -1094,7 +1097,7 @@ FBUF_MAX  equ 319
         VAR xel, 1
         VAR fbuf, FBUF_MAX+1    ; a link / a date as it comes (or a tag's attributes)
         VAR alen, 2
-        VAR items, MAX_ITEMS*7  ; per story: where in the pool, days, minutes, flags
+        VAR items, (MAX_ITEMS+1)*IT_SIZE   ; per story: where in the pool, its length, days, minutes, flags, its place in the feed
         VAR nitems, 1
         VAR feed_full, 1
         VAR it_start, 2
@@ -1104,7 +1107,8 @@ FBUF_MAX  equ 319
         VAR it_clen, 2
         VAR it_tlen, 2
         VAR fstart, 2
-        VAR a_story, 1          ; (M_ART: the story whose content is wanted)
+        VAR a_story, 1          ; the story whose article is wanted (its index)
+        VAR a_pos, 1            ; (M_ART: its place in the feed)
         VAR a_stop, 1
 
 ; x_run: BC bytes of the feed at HL -> CF: enough (the stories are full, or the article in)
@@ -1878,7 +1882,7 @@ tag_done:
         ld a,b
         cp F_CONTENT
         ret nz
-        ld a,(a_story)
+        ld a,(a_pos)
         ld hl,xitem
         cp (hl)
         ret nz
@@ -2083,39 +2087,39 @@ item_start:
 item_end:
         xor a
         ld (in_item),a
-        ld a,(xmode)
+        ld hl,xitem             ; its place in the feed
+        ld c,(hl)
+        inc (hl)
+        jr nz,.p
+        dec (hl)                ; (at most 255)
+.p:     ld a,(xmode)
         or a
         jr z,.list
-        ld a,(a_story)          ; the article: the story's content is in
-        ld hl,xitem
-        cp (hl)
-        jr nz,.nx
+        ld a,(a_pos)            ; the article: the story's content is in
+        cp c
+        ret nz
         ld a,1
         ld (a_stop),a
-.nx:    inc (hl)
         ret
-.list:  ld a,(feed_full)
-        or a
-        ret nz
-        ld a,(w_full)
-        or a
-        jr nz,.full
-        ld a,(it_have)
+.list:  ld a,(it_have)
         and 1
         jr z,.drop
-        ld a,(nitems)           ; its entry
-        ld l,a
-        ld h,0
-        ld d,h
-        ld e,l
-        add hl,hl
-        add hl,hl
-        add hl,hl
+        ld a,(w_full)
         or a
-        sbc hl,de               ; * 7
-        ld de,items
-        add hl,de
+        jr nz,.drop
+        ld a,(nitems)           ; its entry, at the end
+        call it_ptr
         ld de,(it_start)
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        inc hl
+        push hl
+        ld hl,(w_len)
+        or a
+        sbc hl,de
+        ex de,hl
+        pop hl
         ld (hl),e
         inc hl
         ld (hl),d
@@ -2144,18 +2148,408 @@ item_end:
         jr z,.f
         inc a
 .f:     ld (hl),a
+        inc hl
+        ld (hl),c               ; its place
         ld hl,nitems
         inc (hl)
-        ld a,(hl)
-        cp MAX_ITEMS
-        ret c
-        ld a,1
-        ld (feed_full),a
-        ret
-.full:  ld a,1
-        ld (feed_full),a
+        jp it_room
 .drop:  ld hl,(it_start)
         jp w_trunc
+
+;------------------------------------------------------------------------------
+; the stories kept: when there is no more room (MAX_ITEMS, or less than RESERVE
+; bytes for the next one), the oldest story goes - the new one when it is the
+; oldest, or has no date; the room of those in between comes back by moving
+; the stories after them down (now and then: when it is needed)
+; +0 where, +2 length, +4 days, +6 minutes, +8 flags, +9 place
+        VAR it_rsv, 2           ; room kept for the next story: an eighth of the pool
+        VAR garbage, 2          ; the bytes of stories that went
+        VAR it_tmp, IT_SIZE
+        VAR srt_date, 1         ; 1: newest first, 0: the feed's order
+        VAR io_i, 1
+
+; it_ptr: A = story -> HL = its entry (DE, BC kept)
+it_ptr: push de
+        ld l,a
+        ld h,0
+        add hl,hl
+        ld d,h
+        ld e,l
+        add hl,hl
+        add hl,hl
+        add hl,de               ; * 10
+        ld de,items
+        add hl,de
+        pop de
+        ret
+
+; is there room for the next story? if not, stories go
+it_room:
+        ld a,(nitems)
+        cp MAX_ITEMS+1
+        jr nc,.short
+        ld hl,(w_left)          ; (with the garbage: it comes back below)
+        ld de,(garbage)
+        add hl,de
+        ld de,(it_rsv)
+        or a
+        sbc hl,de
+        jr nc,.ok
+.short: ld a,(nitems)           ; the new one (the last) without a date: it goes
+        dec a
+        ld (io_i),a
+        call it_ptr
+        ld de,4
+        add hl,de
+        ld a,(hl)
+        inc hl
+        or (hl)
+        jr z,.new
+        call it_oldest          ; else the oldest
+        jr c,.new
+        ld hl,io_i
+        cp (hl)
+        jr z,.new
+        call it_remove          ; (its room: garbage)
+        jr it_room
+.new:   ld a,(io_i)             ; the new one: off the end of the pool
+        call it_ptr
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ex de,hl
+        call w_trunc
+        ld hl,nitems
+        dec (hl)
+.ok:    ld hl,(w_left)          ; the room of those that went: back when it is short
+        ld de,(it_rsv)
+        or a
+        sbc hl,de
+        ret nc
+        ld hl,(garbage)
+        ld a,h
+        or l
+        ret z
+        jp it_compact
+
+; it_oldest: A = the oldest story with a date (CF: none)
+it_oldest:
+        ld a,#FF
+        ld (io_o),a
+        ld b,0
+.l:     ld a,b
+        ld hl,nitems
+        cp (hl)
+        jr nc,.e
+        call it_ptr
+        ld de,4
+        add hl,de
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld a,d
+        or e
+        jr z,.n                 ; (no date)
+        ld c,(hl)
+        inc hl
+        ld h,(hl)
+        ld l,c                  ; DE = days, HL = minutes
+        ld a,(io_o)
+        inc a
+        jr z,.t                 ; (the first)
+        push hl                 ; older than the oldest so far?
+        ld hl,(io_d)
+        or a
+        sbc hl,de
+        pop hl
+        jr c,.n
+        jr nz,.t
+        push de
+        ld de,(io_m)
+        ex de,hl
+        or a
+        sbc hl,de               ; io_m - this one's minutes
+        ex de,hl
+        pop de
+        jr c,.n
+        jr z,.n
+.t:     ld a,b
+        ld (io_o),a
+        ld (io_d),de
+        ld (io_m),hl
+.n:     inc b
+        jr .l
+.e:     ld a,(io_o)
+        cp #FF
+        ccf
+        ret
+        VAR io_o, 1
+        VAR io_d, 2
+        VAR io_m, 2
+
+; it_remove: story A out of the list (its bytes are garbage until it_compact)
+it_remove:
+        push af
+        call it_ptr
+        inc hl
+        inc hl
+        ld e,(hl)
+        inc hl
+        ld d,(hl)
+        ld hl,(garbage)
+        add hl,de
+        ld (garbage),hl
+        pop af
+        push af
+        call it_ptr             ; the ones after it, up
+        ex de,hl
+        ld hl,IT_SIZE
+        add hl,de
+        pop af
+        push hl
+        ld hl,nitems
+        ld c,a
+        ld a,(hl)
+        dec (hl)
+        sub c
+        dec a                   ; the entries after it
+        pop hl
+        ret z
+        ld b,a
+        ld c,0
+.m:     push bc                 ; B * IT_SIZE bytes
+        ld bc,IT_SIZE
+        ldir
+        pop bc
+        djnz .m
+        ret
+
+; it_compact: the stories moved down over the garbage (in the pool's order)
+it_compact:
+        call w_flush
+        ld hl,0
+        ld (ic_dst),hl
+        xor a
+.l:     ld (io_i),a
+        ld hl,nitems
+        cp (hl)
+        jr nc,.e
+        call it_ptr
+        ld e,(hl)               ; DE = where it is
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld c,(hl)               ; BC = its length
+        inc hl
+        ld b,(hl)
+        dec hl                  ; (back to its start)
+        dec hl
+        dec hl
+        push de
+        ld de,(ic_dst)          ; its new place
+        ld (hl),e
+        inc hl
+        ld (hl),d
+        pop de
+        push bc
+        call it_move            ; DE -> ic_dst, BC bytes
+        pop bc
+        ld hl,(ic_dst)
+        add hl,bc
+        ld (ic_dst),hl
+        ld a,(io_i)
+        inc a
+        jr .l
+.e:     ld hl,(ic_dst)          ; the writer after the last one
+        ld (w_len),hl
+        ld (w_fl),hl
+        ex de,hl
+        ld hl,(w_size)
+        or a
+        sbc hl,de
+        ld (w_left),hl
+        ld hl,0
+        ld (garbage),hl
+        xor a
+        ld (w_cnt),a
+        ld (w_full),a
+        ld hl,wbuf
+        ld (w_ptr),hl
+        ret
+        VAR ic_dst, 2
+
+; it_move: BC bytes of the pool from DE down to ic_dst (through win)
+it_move:
+        ld hl,(ic_dst)
+        or a
+        sbc hl,de
+        ret z                   ; (in place)
+        ld (im_to),hl           ; (as an offset: dst = ic_dst, src = DE)
+        ld hl,(ic_dst)
+        ld (im_dst),hl
+        ld (im_src),de
+.c:     ld a,b
+        or c
+        ret z
+        push bc
+        ld a,b                  ; at most 96 at a time
+        or a
+        jr nz,.b
+        ld a,c
+        cp 96
+        jr c,.k
+.b:     ld bc,96
+.k:     push bc
+        ld hl,(pool_base)
+        ld de,(im_src)
+        add hl,de
+        ld de,win
+        call vr_blk
+        pop bc
+        push bc
+        ld hl,(pool_base)
+        ld de,(im_dst)
+        add hl,de
+        ld de,win
+        call vw_blk
+        pop bc
+        ld hl,(im_src)
+        add hl,bc
+        ld (im_src),hl
+        ld hl,(im_dst)
+        add hl,bc
+        ld (im_dst),hl
+        pop hl                  ; the rest
+        or a
+        sbc hl,bc
+        ld b,h
+        ld c,l
+        jr .c
+        VAR im_to, 2
+        VAR im_src, 2
+        VAR im_dst, 2
+
+; it_sort: the stories newest first (srt_date; without a date after them, in the
+; feed's order) or in the feed's order; the article's story found again
+it_sort:
+        ld a,1
+.i:     ld hl,nitems
+        cp (hl)
+        jr nc,.e
+        ld (io_i),a
+        call it_ptr             ; x = items[i]
+        ld de,it_tmp
+        ld bc,IT_SIZE
+        ldir
+        ld a,(io_i)
+        ld c,a                  ; j
+.j:     ld a,c
+        or a
+        jr z,.put
+        dec a
+        push bc
+        call it_ptr             ; items[j-1]
+        call it_before          ; x before it?
+        pop bc
+        jr nc,.put
+        ld a,c                  ; items[j] = items[j-1]
+        dec a
+        call it_ptr
+        push hl
+        ld a,c
+        call it_ptr
+        ex de,hl
+        pop hl
+        push bc
+        ld bc,IT_SIZE
+        ldir
+        pop bc
+        dec c
+        jr .j
+.put:   ld a,c
+        call it_ptr
+        ex de,hl
+        ld hl,it_tmp
+        ld bc,IT_SIZE
+        ldir
+        ld a,(io_i)
+        inc a
+        jr .i
+.e:     ld a,(a_st)             ; the article's story: where it is now
+        or a
+        ret z
+        ld b,0
+.f:     ld a,b
+        ld hl,nitems
+        cp (hl)
+        ret nc
+        call it_ptr
+        ld de,9
+        add hl,de
+        ld a,(a_pos)
+        cp (hl)
+        jr z,.fd
+        inc b
+        jr .f
+.fd:    ld a,b
+        ld (a_story),a
+        ret
+
+; it_before: CF when it_tmp goes before the entry at HL
+it_before:
+        ld a,(srt_date)
+        or a
+        jr z,.pos
+        push hl
+        ld de,4
+        add hl,de
+        ld e,(hl)               ; DE = its days, (HL+2) its minutes
+        inc hl
+        ld d,(hl)
+        inc hl
+        ld c,(hl)
+        inc hl
+        ld b,(hl)               ; BC = its minutes
+        ld hl,(it_tmp+4)
+        ld a,h
+        or l
+        jr z,.xu
+        ld a,d                  ; x has a date: before one without
+        or e
+        jr z,.yes
+        or a                    ; later day: before
+        push hl
+        sbc hl,de
+        pop hl
+        jr z,.sd
+        pop hl
+        ccf
+        ret c                   ; (x > y: CF)
+        or a
+        ret
+.sd:    ld hl,(it_tmp+6)        ; the same day: later minutes first
+        or a
+        sbc hl,bc
+        jr z,.eq
+        pop hl
+        ccf
+        ret
+.xu:    ld a,d                  ; x without a date: after one with
+        or e
+        jr z,.eq
+        pop hl
+        or a
+        ret
+.yes:   pop hl
+        scf
+        ret
+.eq:    pop hl
+.pos:   ld de,9                 ; the feed's order
+        add hl,de
+        ld a,(it_tmp+9)
+        cp (hl)
+        ret
 
 ;------------------------------------------------------------------------------
 ; parse_date: HL = "Thu, 29 Oct 2026 20:15:00 GMT" / "+0100" / "EST",

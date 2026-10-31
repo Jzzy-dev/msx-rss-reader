@@ -10,3 +10,4 @@ http://rss.dw.com/xml/rss-en-all - 302 /rdf/rss-en-all
 http://rss.dw.com/rdf/rss-en-all dw.rdf
 https://www.theguardian.com/world/rss guard.xml
 https://feeds.nos.nl/nosnieuwsalgemeen nos.xml
+http://news.test/many many.xml
