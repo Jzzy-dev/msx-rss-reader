@@ -1,0 +1,9 @@
+test/z80_rss
+test/ini/
+test/omsx/hd.dsk
+test/omsx/blank.dsk
+test/omsx/shot_*.png
+test/omsx/run.tcl
+test/omsx/dbg*.tcl
+*.sym
+*.lst
