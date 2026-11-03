@@ -47,7 +47,8 @@ cat_feeds:                      ; topic, code, name, URL
         db 2,"nuus",0,"Nieuwsuur",0,"https://feeds.nos.nl/nieuwsuuralgemeen",0
         db 2,"jeugd",0,"NOS Jeugdjournaal",0,"https://feeds.nos.nl/jeugdjournaal",0
         db 2,"nu",0,"NU.nl",0,"https://www.nu.nl/rss/Algemeen",0
-        db 2,"tweak",0,"Tweakers",0,"https://feeds.feedburner.com/tweakers/mixed",0
+        db 2,"tweak",0,"Tweakers",0,"https://tweakers.net/feeds/mixed.xml",0
+        db 2,"tweakn",0,"Tweakers, nieuws",0,"https://tweakers.net/feeds/nieuws.xml",0
         db 3,"tages",0,"tagesschau",0,"https://www.tagesschau.de/index~rss2.xml",0
         db 3,"spiegel",0,"Der Spiegel",0,"https://www.spiegel.de/schlagzeilen/index.rss",0
         db 3,"dwde",0,"DW (Deutsch)",0,"https://rss.dw.com/xml/rss-de-all",0

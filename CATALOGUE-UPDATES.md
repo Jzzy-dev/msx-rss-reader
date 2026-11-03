@@ -10,8 +10,8 @@ A feed keeps its code, so it stays in My feeds after the update.
 
 | Code | Feed | Now | Change to | Status |
 |---|---|---|---|---|
-| `tweak` | Tweakers | `https://feeds.feedburner.com/tweakers/mixed` (does not work) | `https://tweakers.net/feeds/mixed.xml` | to do |
-| `tweakn` (new) | Tweakers, nieuws | - | `https://tweakers.net/feeds/nieuws.xml` | to do |
+| `tweak` | Tweakers | `https://feeds.feedburner.com/tweakers/mixed` (does not work) | `https://tweakers.net/feeds/mixed.xml` | done in the RSS reader |
+| `tweakn` (new) | Tweakers, nieuws | - | `https://tweakers.net/feeds/nieuws.xml` | done in the RSS reader |
 
 ## To look into
 

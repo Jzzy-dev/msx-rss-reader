@@ -72,7 +72,7 @@ tz=+60
 sort=date
 ```
 
-- **`feeds=`** My feeds, in order (at most 20). The codes are those of the catalogue (`src/feeds_cat.c`: 110 feeds in 11 topics, the same as in PicoAmp). `#1`..`#9` refer to `feed1=`..`feed9=` lines with your own feeds. The reader rewrites this line when you change My feeds in the program. Without it, the default feeds apply, plus any `feedN=` lines.
+- **`feeds=`** My feeds, in order (at most 20). The codes are those of the catalogue (`src/feeds_cat.c`: 111 feeds in 11 topics, as in PicoAmp plus Tweakers nieuws). `#1`..`#9` refer to `feed1=`..`feed9=` lines with your own feeds. The reader rewrites this line when you change My feeds in the program. Without it, the default feeds apply, plus any `feedN=` lines.
 - **`proxy=`** host:port of `rss_proxy.py`, used for https when the network has no TLS.
 - **`sort=`** `date` (newest first, the default) or `feed` (the feed's order). The S key sets it.
 - **`tz=`** local time minus UTC, in minutes. Without it, an MSX2 works it out from its clock chip and the web's Date header. Times are shown in local time: "20:15" for today, "29 Oct" for an earlier day.
