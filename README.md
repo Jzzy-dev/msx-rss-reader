@@ -7,12 +7,13 @@ PicoAmp's news reader as a standalone program, for any MSX with a TCP/IP UNAPI n
 - HTML to text, entities and UTF-8;
 - the full article: the feed's `<content:encoded>`, or the `<p>` text of the story's web page.
 
-It comes as two programs:
+It comes as three programs:
 
 | File | For | Notes |
 |---|---|---|
 | `RSS.COM` | MSX-DOS 1, MSX-DOS 2, Nextor | Run `RSS`. |
 | `RSS.ROM` | a 32 KB cartridge (plain, no mapper) | It starts once the disk system is ready, so RSS.INI is read from and saved to the boot disk. **Q** or **ESC** returns to BASIC. |
+| `RSSW.ROM` | the MSX Pico+ menu (v2.13), started from the SD browser | RSS.ROM packed into 16 KB, so the menu loads it in WIFI+Telnet mode with its Wi-Fi BIOS. See [The MSX Pico+](#the-msx-pico). |
 
 **Screen modes:**
 - **MSX2, MSX2+ and turbo R:** 80 columns (TEXT 2, 26 rows), with the selection bars in the blink colours. Accents are shown in the MSX character set (é, ü, ñ, ...) on international machines.
@@ -46,6 +47,16 @@ How https is handled:
   - Without a proxy, the reader tries the same URL over http. Many feeds still answer there; the BBC and DW feeds do. A site that sends you back to https gets the message "it needs https, the network has no TLS".
 
 Stock openMSX has no network emulation. Use openMSXnet(-tls) for that.
+
+## The MSX Pico+
+
+The Pico+'s ESP8266 is only reachable when the menu starts a ROM in its **WIFI+Telnet** mode, which also puts its Wi-Fi BIOS (the TCP/IP UNAPI) in the slot. RSS.ROM started from the SD browser runs as a plain ROM, without that BIOS, so it finds no network. The menu uses WIFI+Telnet for a file of exactly 16 KB that has "UNAPI" in it, so RSSW.ROM is made to be one:
+
+- It holds RSS.ROM packed with ZX0 (25 KB to 15 KB) and a small loader.
+- Its INIT asks Nextor for Disk BASIC 2 (USRTAB), so FAT16 SD cards work, and hooks H.STKE.
+- At H.STKE it unpacks RSS into the RAM of pages 1 and 2 (through VRAM), runs it from there, and gives the pages back to BASIC when you quit.
+
+Copy RSSW.ROM to the SD card and start it from the menu's SD browser. RSS.INI is read from and saved to the SD card. After a boot through "Nextor+WIFI", RSS.COM works too.
 
 ## Keys
 
@@ -88,7 +99,8 @@ It needs only the Python standard library. It fetches `GET https://...` requests
 ## Building
 
 ```
-./build.sh        # sjasmplus: RSS.COM and RSS.ROM (src/gen_cat.py makes cat.inc from feeds_cat.c)
+./build.sh                      # sjasmplus: RSS.COM and RSS.ROM (src/gen_cat.py makes cat.inc from feeds_cat.c)
+ZX0=zx0 sh tools/build_rssw.sh  # then RSSW.ROM from RSS.ROM (needs ZX0 v2.2)
 ```
 
 The source is Z80 assembly for sjasmplus. It is assembled twice: at 0100h with variables at 8000h (COM), and at 4000h with variables at C000h (ROM). Nothing passed to the network is ever in page 1. These are the modules:
@@ -96,6 +108,7 @@ The source is Z80 assembly for sjasmplus. It is assembled twice: at 0100h with v
 | File | |
 |---|---|
 | `rss.asm` | the start (COM, ROM header and H.STKE start), the main loop |
+| `rssw.asm` | RSSW.ROM: the 16 KB loader with the packed RSS.ROM and a ZX0 decoder |
 | `sys.asm` | BIOS, VDP/VRAM, text output, numbers, the clock, dates |
 | `net.asm` | TCP/IP UNAPI (discovery, calls), the HTTP client (DNS, TLS, redirects, proxy) |
 | `parse.asm` | the feed parser, HTML to text, the VRAM writer, dates |
@@ -107,6 +120,7 @@ The source is Z80 assembly for sjasmplus. It is assembled twice: at 0100h with v
 
 - **`test/z80_rss.c`** runs RSS.COM or RSS.ROM in a Z80 emulator with a small MSX around it. It provides the BIOS calls, FCB disk calls, a V9938 or TMS9918, the RTC, and a TCP/IP UNAPI answering from the fixture feeds in `test/fix`. The implementation can sit in a ROM, in page 3 or in a mapper segment, with or without TLS, and with a proxy.
 - **`test/regress.sh`** runs 25 checks with it: every feed format, sorting and a long oldest-first feed, redirects, both kinds of full article, no TLS, the proxy, the three implementation kinds, the ROM, MSX1, My feeds saved, and the time zone. `test/vram2png.py` draws the screen.
+- **`test/test_rssw.c`** runs RSSW.ROM's INIT and H.STKE start on an MSX1 or MSX2 with an expanded slot like the Pico+'s, and checks that RSS is unpacked byte for byte, runs from RAM, and that BASIC gets its pages back.
 - **`test/omsx/`** has a Tcl TCP/IP UNAPI implementation for openMSX (`unapi.tcl`, with `FAKEUNAPI.ROM`). It was used to test both programs on a real MSX2 BIOS with Nextor and with disk BASIC (the ROM's H.STKE start, RSS.INI saved on the disk).
 
 This work is licensed under a "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License", as PicoAmp is.
