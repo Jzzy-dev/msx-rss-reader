@@ -14,6 +14,9 @@
 ; License". https://creativecommons.org/licenses/by-nc-sa/4.0/
 ;==============================================================================
 
+USRTAB  equ #F39A               ; USR addresses (Nextor looks at USR0)
+FCERR   equ #475A               ; (their value when nothing is defined)
+
         IFDEF ROMBUILD
 VARS    equ #C000
         ELSE
@@ -55,7 +58,10 @@ rom_init:
         and #0C
         or c
         ld c,a
-.p:     ld hl,H_STKE
+.p:     ld hl,FCERR+1           ; USRTAB <> FCERR: Nextor (MSX-DOS 2) starts
+        ld (USRTAB),hl          ; Disk BASIC 2 before H.STKE, not MSX-DOS 1
+                                ; mode (where FAT16 drives give Disk I/O error)
+        ld hl,H_STKE
         ld (hl),#F7             ; RST 30h (CALLF) slot, rom_start
         inc hl
         ld (hl),c
@@ -74,6 +80,30 @@ rom_start:
 .c:     ld (hl),#C9
         inc hl
         djnz .c
+        ld hl,FCERR             ; USR0 as BASIC has it
+        ld (USRTAB),hl
+        push af
+        ; the TCP/IP UNAPI asked for once now: an implementation may take
+        ; its RAM under HIMEM on that first call (the ESP8266 BIOS of the
+        ; MSX Pico+ / PicoVerse takes 30 bytes), before we use HIMEM below
+        ld a,(HOKVLD)
+        rrca
+        jr nc,.nx
+        ld hl,txt_tcpip
+        ld de,ARG
+        ld bc,7
+        ldir
+        xor a
+        ld b,a
+        ld de,#2222
+        call EXTBIO
+        ld a,b
+        or a
+        jr z,.nx
+        ld a,1
+        ld de,#2222
+        call EXTBIO
+.nx:    pop af
         ld c,a
         ; BASIC's stack may be where our variables go: 256 bytes of it kept
         ; below HIMEM, our stack under HIMEM; all back at the end
